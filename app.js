@@ -12,7 +12,13 @@ import orderRouter from "./router/orderRoutes.js";
 import Stripe from "stripe";
 import database from "./database/db.js";
 import dotenv from 'dotenv';
+import path from "path";
+import { fileURLToPath } from "url";
 import payment from "./router/payment.js";
+import webRouter from "./router/webRoutes.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
@@ -22,13 +28,32 @@ const app = express();
 
 app.use(
   cors({
-    origin: [process.env.FRONTEND_URL, process.env.DASHBOARD_URL, "http://localhost:5174", "http://localhost:5173", "https://anantayurvedaa.vercel.app", "https://ecom-desbord.vercel.app"],
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      const allowedOrigins = [
+        process.env.FRONTEND_URL,
+        process.env.DASHBOARD_URL,
+        "http://localhost:5173",
+        "http://localhost:5174",
+        "http://localhost:5175",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:5174",
+        "http://127.0.0.1:5175",
+      ].filter(Boolean);
+
+      if (
+        allowedOrigins.includes(origin) ||
+        origin.includes("localhost") ||
+        origin.includes("127.0.0.1")
+      ) {
+        return callback(null, true);
+      }
+      return callback(null, true);
+    },
     methods: ["GET", "POST", "PUT", "DELETE"],
     credentials: true,
   })
 );
-
-
 
 app.post(
   "/api/v1/payment/webhook",
@@ -100,14 +125,16 @@ app.use(
   })
 );
 
-
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+app.use("/public", express.static(path.join(__dirname, "public")));
+app.use("/new", express.static(path.join(__dirname, "public", "new")));
 
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/product", productRouter);
 app.use("/api/v1/admin", adminRouter);
 app.use("/api/v1/order", orderRouter);
-app.use("/api/v1/payment", payment)
-
+app.use("/api/v1/payment", payment);
+app.use("/api/v1/web", webRouter);
 
 createTables();
 

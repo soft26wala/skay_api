@@ -4,11 +4,15 @@ export async function createPaymentsTable() {
     const query = `CREATE TABLE IF NOT EXISTS payments (
         id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
         order_id UUID NOT NULL UNIQUE,
-        payment_type VARCHAR(20) NOT NULL CHECK (payment_type IN ('Online')),
+        payment_type VARCHAR(20) NOT NULL CHECK (payment_type IN ('Online', 'COD', 'Cash on Delivery')),
         payment_status VARCHAR(20) NOT NULL CHECK (payment_status IN ('Paid', 'Pending', 'Failed')),         
         payment_intent_id VARCHAR(255) UNIQUE,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE);`;
+        FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE);
+        
+        ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_payment_type_check;
+        ALTER TABLE payments ADD CONSTRAINT payments_payment_type_check CHECK (payment_type IN ('Online', 'COD', 'Cash on Delivery'));
+        `;
     await database.query(query);
   } catch (error) {
     console.error("❌ Failed To Create Payments Table.", error);

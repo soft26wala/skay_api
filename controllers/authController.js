@@ -20,9 +20,12 @@ export const register = catchAsyncErrors(async (req, res, next) => {
     );
   }
 
+  const cleanEmail = email.trim().toLowerCase();
+  const cleanNumber = number.toString().trim();
+
   const isAlreadyRegistered = await database.query(
-    `SELECT * FROM users WHERE email = $1`,
-    [email],
+    `SELECT * FROM users WHERE LOWER(email) = LOWER($1)`,
+    [cleanEmail],
   );
 
   if (isAlreadyRegistered.rows.length > 0) {
@@ -31,9 +34,10 @@ export const register = catchAsyncErrors(async (req, res, next) => {
     );
   }
 
+  const altNumber = cleanNumber.startsWith("0") ? cleanNumber.slice(1) : "0" + cleanNumber;
   const isAlreadyRegisterednum = await database.query(
-    `SELECT * FROM users WHERE number = $1`,
-    [number],
+    `SELECT * FROM users WHERE number = $1 OR number = $2`,
+    [cleanNumber, altNumber],
   );
 
   if (isAlreadyRegisterednum.rows.length > 0) {
@@ -43,39 +47,46 @@ export const register = catchAsyncErrors(async (req, res, next) => {
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
-  // const hashedPassword = await bcrypt.hash(password, process.env.JWT_SECRET_KEY);
+
+  // Automatically assign Admin role to first user or site owner email
+  const countResult = await database.query("SELECT COUNT(*) FROM users;");
+  const isFirstUser = parseInt(countResult.rows[0].count, 10) === 0;
+  const role =
+    isFirstUser || cleanEmail === "anmolsingh26ff@gmail.com" ? "Admin" : "User";
 
   const user = await database.query(
-    "INSERT INTO users (name, email, password, number) VALUES ($1, $2, $3, $4) RETURNING *",
-    [name, email, hashedPassword, number],
+    "INSERT INTO users (name, email, password, number, role) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+    [name.trim(), cleanEmail, hashedPassword, cleanNumber, role],
   );
   sendToken(user.rows[0], 201, "User registered successfully", res);
 });
 
 export const login = catchAsyncErrors(async (req, res, next) => {
-  const { number, password } = req.body;
+  const { number, email, password } = req.body;
+  const identifier = (number || email || "").toString().trim();
 
-  if (!number || !password) {
-    return next(new ErrorHandler("Please provide number and password.", 400));
+  if (!identifier || !password) {
+    return next(new ErrorHandler("Please provide number or email and password.", 400));
   }
 
-  // 1. यूज़र ढूंढो
+  // 1. यूज़र ढूंढो (Phone number with/without leading 0, ya Email)
+  const altNumber = identifier.startsWith("0") ? identifier.slice(1) : "0" + identifier;
   const userResult = await database.query(
-    `SELECT * FROM users WHERE number = $1`,
-    [number],
+    `SELECT * FROM users WHERE number = $1 OR number = $2 OR LOWER(email) = LOWER($1)`,
+    [identifier, altNumber],
   );
 
   if (userResult.rows.length === 0) {
-    return next(new ErrorHandler("Invalid number or password.", 401));
+    return next(new ErrorHandler("Invalid credentials.", 401));
   }
 
   const user = userResult.rows[0];
 
-  // 2. password compare करो — नया hash बनाने की जरूरत नहीं
+  // 2. password compare करो
   const isPasswordMatch = await bcrypt.compare(password, user.password);
 
   if (!isPasswordMatch) {
-    return next(new ErrorHandler("Invalid number or password.", 401));
+    return next(new ErrorHandler("Invalid credentials.", 401));
   }
 
   // 3. सफल → token भेजो

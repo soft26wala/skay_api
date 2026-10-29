@@ -53,14 +53,14 @@ export const createOrder = async (req, res) => {
     }
 
     const tax = cgst + sgst + igst;
-    const shipping = total >= 400 ? 0 : 40;
+    const shipping = total >= 75 ? 0 : 5;
     const finalAmount = Math.round(total + tax + shipping);
 
     const razorpay = createRazorpayInstance();
 
     const order = await razorpay.orders.create({
       amount: Math.round(finalAmount * 100),
-      currency: "INR",
+      currency: "CAD",
       receipt: `rcp_${Date.now()}`,
     });
 
@@ -119,7 +119,7 @@ export const verifyPayment = async (req, res) => {
     }
 
     // const tax = total * 0.18;
-    // const shipping = total >= 400 ? 0 : 40;
+    // const shipping = total >= 75 ? 0 : 5;
     // const finalAmount = total + tax + shipping;
 
     const SELLER_STATE = "PUNJAB";
@@ -139,14 +139,25 @@ export const verifyPayment = async (req, res) => {
     }
 
     const tax = cgst + sgst + igst;
-    const shipping = total >= 400 ? 0 : 40;
+    const shipping = total >= 75 ? 0 : 5;
     const finalAmount = Math.round(total + tax + shipping);
+
+    let validBuyerId = null;
+    if (user_id) {
+      try {
+        const u = await db.query("SELECT id FROM users WHERE id::text = $1", [String(user_id)]);
+        if (u.rows.length > 0) validBuyerId = u.rows[0].id;
+      } catch (e) {
+        validBuyerId = null;
+      }
+    }
+
     // ✅ SAVE ORDER
     const orderResult = await db.query(
       `INSERT INTO orders 
   (buyer_id, total_price, tax_price, shipping_price, cgst, sgst, igst, paid_at)
   VALUES ($1, $2, $3, $4, $5, $6, $7, NOW()) RETURNING id`,
-      [user_id, finalAmount, tax, shipping, cgst, sgst, igst],
+      [validBuyerId, finalAmount, tax, shipping, cgst, sgst, igst],
     );
 
     const orderId = orderResult.rows[0].id;
@@ -262,33 +273,42 @@ export const createCODOrder = async (req, res) => {
     }
 
     const tax = cgst + sgst + igst;
-    const shipping = total >= 400 ? 0 : 40;
+    const shipping = total >= 75 ? 0 : 5;
     const finalAmount = Math.round(total + tax + shipping);
+
+    let validBuyerId = null;
+    if (user_id) {
+      try {
+        const u = await db.query("SELECT id FROM users WHERE id::text = $1", [String(user_id)]);
+        if (u.rows.length > 0) validBuyerId = u.rows[0].id;
+      } catch (e) {
+        validBuyerId = null;
+      }
+    }
+
     // ✅ ORDER CREATE (paid_at NULL because COD)
     const orderResult = await db.query(
       `INSERT INTO orders 
   (buyer_id, total_price, tax_price, shipping_price, cgst, sgst, igst)
   VALUES ($1, $2, $3, $4, $5, $6, $7)
   RETURNING id`,
-  [user_id, finalAmount, tax, shipping, cgst, sgst, igst],
+      [validBuyerId, finalAmount, tax, shipping, cgst, sgst, igst],
     );
 
-
     if (!orderResult.rows.length) {
-  throw new Error("Order insert failed");
-}
+      throw new Error("Order insert failed");
+    }
 
     const orderId = orderResult.rows[0].id;
 
-
-    // ✅ order items insert
+    // ✅ order items insert & reduce stock
     for (let item of items) {
       const product = await db.query(
         "SELECT name, price, images->0->>'url' AS image FROM products WHERE id = $1",
         [item.productId],
       );
 
-      const p = product.rows[0];
+      const p = product.rows[0] || {};
 
       await db.query(
         `INSERT INTO order_items 
@@ -298,15 +318,18 @@ export const createCODOrder = async (req, res) => {
           orderId,
           item.productId,
           item.qty,
-          p.price,
+          p.price || 0,
           p.image || null,
           p.name || "Product",
         ],
       );
-    }
 
-    // const shipping = total >= 400 ? 0 : 40;
-    // const finalAmount = total + tax + shipping;
+      // Decrement stock
+      await db.query(
+        `UPDATE products SET stock = GREATEST(0, stock - $1) WHERE id = $2`,
+        [item.qty, item.productId]
+      );
+    }
 
     // ✅ shipping info
     await db.query(
@@ -335,11 +358,15 @@ export const createCODOrder = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "COD order placed",
+      message: "COD order placed successfully",
       orderId,
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "COD order failed" });
+    console.error("createCODOrder error:", err);
+    res.status(500).json({
+      success: false,
+      message: err.message || "COD order failed. Please verify details.",
+      error: err.message,
+    });
   }
 };
