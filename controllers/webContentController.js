@@ -862,3 +862,161 @@ export const updateAnnouncement = catchAsyncErrors(async (req, res, next) => {
   });
 });
 
+/* =====================================================================
+   6. NAVIGATION MENU CONTROLLER (Header & Mobile Drawer Navigation)
+===================================================================== */
+let fallbackMenuItems = [
+  { id: "nav-1", name: "Shop All", path: "/products", badge: "", is_active: true, display_order: 1 },
+  { id: "nav-2", name: "Best Sellers", path: "/products?filter=best-sellers", badge: "Popular", is_active: true, display_order: 2 },
+  { id: "nav-3", name: "About Us", path: "/about", badge: "", is_active: true, display_order: 3 },
+  { id: "nav-4", name: "Contact", path: "/contact", badge: "", is_active: true, display_order: 4 },
+  { id: "nav-5", name: "FAQ", path: "/faq", badge: "", is_active: true, display_order: 5 },
+];
+
+export const getMenuItems = catchAsyncErrors(async (req, res, next) => {
+  try {
+    const result = await database.query(
+      `SELECT * FROM navigation_menu ORDER BY display_order ASC, created_at ASC;`
+    );
+    if (result && result.rows && result.rows.length > 0) {
+      return res.status(200).json({
+        success: true,
+        menu: result.rows,
+      });
+    }
+  } catch (error) {
+    console.warn("Database query failed for navigation_menu, using fallback:", error.message);
+  }
+
+  res.status(200).json({
+    success: true,
+    menu: fallbackMenuItems,
+  });
+});
+
+export const createMenuItem = catchAsyncErrors(async (req, res, next) => {
+  const { name, path, badge, display_order, is_active } = req.body;
+  if (!name || !name.trim()) {
+    return next(new ErrorHandler("Menu item name is required.", 400));
+  }
+  if (!path || !path.trim()) {
+    return next(new ErrorHandler("Menu item path/link is required.", 400));
+  }
+
+  const id = `nav-${Date.now()}`;
+  const orderNum = display_order !== undefined && display_order !== "" ? parseInt(display_order, 10) : fallbackMenuItems.length + 1;
+  const activeStatus = is_active !== undefined ? (is_active === true || is_active === "true") : true;
+  const badgeText = badge ? badge.trim() : "";
+
+  let newItem = {
+    id,
+    name: name.trim(),
+    path: path.trim(),
+    badge: badgeText,
+    is_active: activeStatus,
+    display_order: orderNum,
+  };
+
+  try {
+    const result = await database.query(
+      `INSERT INTO navigation_menu (id, name, path, badge, is_active, display_order)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING *;`,
+      [id, newItem.name, newItem.path, newItem.badge, newItem.is_active, newItem.display_order]
+    );
+    if (result && result.rows && result.rows.length > 0) {
+      newItem = result.rows[0];
+    }
+  } catch (error) {
+    console.warn("Database error creating navigation menu item, saving to fallback:", error.message);
+  }
+
+  fallbackMenuItems.push(newItem);
+  fallbackMenuItems.sort((a, b) => a.display_order - b.display_order);
+
+  res.status(201).json({
+    success: true,
+    message: "Menu item created successfully.",
+    item: newItem,
+  });
+});
+
+export const updateMenuItem = catchAsyncErrors(async (req, res, next) => {
+  const { id } = req.params;
+  const { name, path, badge, display_order, is_active } = req.body;
+
+  const orderNum = display_order !== undefined && display_order !== "" ? parseInt(display_order, 10) : null;
+  const activeStatus = is_active !== undefined ? (is_active === true || is_active === "true") : null;
+
+  let updatedItem = null;
+  try {
+    const query = `
+      UPDATE navigation_menu
+      SET name = COALESCE($1, name),
+          path = COALESCE($2, path),
+          badge = COALESCE($3, badge),
+          is_active = COALESCE($4, is_active),
+          display_order = COALESCE($5, display_order),
+          updated_at = CURRENT_TIMESTAMP
+      WHERE id::text = $6
+      RETURNING *;
+    `;
+    const result = await database.query(query, [
+      name !== undefined ? name.trim() : null,
+      path !== undefined ? path.trim() : null,
+      badge !== undefined ? badge.trim() : null,
+      activeStatus,
+      orderNum,
+      id,
+    ]);
+    if (result && result.rows && result.rows.length > 0) {
+      updatedItem = result.rows[0];
+    }
+  } catch (error) {
+    console.warn("Database error on navigation menu update:", error.message);
+  }
+
+  const idx = fallbackMenuItems.findIndex((item) => item.id === id);
+  if (idx !== -1) {
+    fallbackMenuItems[idx] = {
+      ...fallbackMenuItems[idx],
+      ...(name !== undefined && { name: name.trim() }),
+      ...(path !== undefined && { path: path.trim() }),
+      ...(badge !== undefined && { badge: badge.trim() }),
+      ...(activeStatus !== null && { is_active: activeStatus }),
+      ...(orderNum !== null && { display_order: orderNum }),
+    };
+    if (!updatedItem) updatedItem = fallbackMenuItems[idx];
+  }
+
+  if (!updatedItem) {
+    updatedItem = { id, name, path, badge, is_active: activeStatus, display_order: orderNum };
+  }
+
+  fallbackMenuItems.sort((a, b) => a.display_order - b.display_order);
+
+  res.status(200).json({
+    success: true,
+    message: "Menu item updated successfully.",
+    item: updatedItem,
+  });
+});
+
+export const deleteMenuItem = catchAsyncErrors(async (req, res, next) => {
+  const { id } = req.params;
+
+  try {
+    await database.query(`DELETE FROM navigation_menu WHERE id::text = $1;`, [id]);
+  } catch (error) {
+    console.warn("Database error on navigation menu delete:", error.message);
+  }
+
+  fallbackMenuItems = fallbackMenuItems.filter((item) => item.id !== id);
+
+  res.status(200).json({
+    success: true,
+    message: "Menu item deleted successfully.",
+  });
+});
+
+

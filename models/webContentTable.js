@@ -134,6 +134,42 @@ export async function createWebContentTables() {
     } catch (e) {
       console.warn("Site settings seed notice:", e.message);
     }
+
+    // 6. Navigation Menu Table (Dynamic Storefront Header & Mobile Links)
+    await database.query(`
+      CREATE TABLE IF NOT EXISTS navigation_menu (
+        id VARCHAR(50) PRIMARY KEY,
+        name VARCHAR(100) NOT NULL,
+        path VARCHAR(255) NOT NULL,
+        badge VARCHAR(50) DEFAULT '',
+        is_active BOOLEAN DEFAULT true,
+        display_order INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    try {
+      const menuCheck = await database.query(`SELECT COUNT(*) FROM navigation_menu;`);
+      if (parseInt(menuCheck.rows[0].count, 10) === 0) {
+        const defaultNavItems = [
+          { id: "nav-1", name: "Shop All", path: "/products", badge: "", display_order: 1 },
+          { id: "nav-2", name: "Best Sellers", path: "/products?filter=best-sellers", badge: "Popular", display_order: 2 },
+          { id: "nav-3", name: "About Us", path: "/about", badge: "", display_order: 3 },
+          { id: "nav-4", name: "Contact", path: "/contact", badge: "", display_order: 4 },
+          { id: "nav-5", name: "FAQ", path: "/faq", badge: "", display_order: 5 },
+        ];
+        for (const item of defaultNavItems) {
+          await database.query(
+            `INSERT INTO navigation_menu (id, name, path, badge, is_active, display_order)
+             VALUES ($1, $2, $3, $4, true, $5) ON CONFLICT (id) DO NOTHING;`,
+            [item.id, item.name, item.path, item.badge, item.display_order]
+          );
+        }
+      }
+    } catch (e) {
+      console.warn("Navigation menu seed notice:", e.message);
+    }
   } catch (error) {
     console.error("Failed to create web content tables:", error.message || error);
   }

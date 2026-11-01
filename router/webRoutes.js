@@ -18,6 +18,10 @@ import {
   deleteWhyChooseFeature,
   getAnnouncement,
   updateAnnouncement,
+  getMenuItems,
+  createMenuItem,
+  updateMenuItem,
+  deleteMenuItem,
 } from "../controllers/webContentController.js";
 
 const router = express.Router();
@@ -50,5 +54,11 @@ router.delete("/why-choose/:id", deleteWhyChooseFeature);
 router.get("/announcement", getAnnouncement);
 router.post("/announcement", updateAnnouncement);
 router.put("/announcement", updateAnnouncement);
+
+// 6. Navigation Menu Routes (Header & Mobile Drawer)
+router.get("/menu", getMenuItems);
+router.post("/menu", createMenuItem);
+router.put("/menu/:id", updateMenuItem);
+router.delete("/menu/:id", deleteMenuItem);
 
 export default router;
