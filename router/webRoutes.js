@@ -22,6 +22,8 @@ import {
   createMenuItem,
   updateMenuItem,
   deleteMenuItem,
+  getBackgroundSettings,
+  updateBackgroundSettings,
 } from "../controllers/webContentController.js";
 
 const router = express.Router();
@@ -61,4 +63,10 @@ router.post("/menu", createMenuItem);
 router.put("/menu/:id", updateMenuItem);
 router.delete("/menu/:id", deleteMenuItem);
 
+// 7. Background Theme & Sky Clouds Animation Routes
+router.get("/background", getBackgroundSettings);
+router.post("/background", updateBackgroundSettings);
+router.put("/background", updateBackgroundSettings);
+
 export default router;
+

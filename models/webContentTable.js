@@ -131,6 +131,49 @@ export async function createWebContentTables() {
           ["Haute Formulation & Complimentary Concierge Delivery on Orders Above $75 CAD"]
         );
       }
+
+      const bgCheck = await database.query(`SELECT COUNT(*) FROM site_settings WHERE key = 'site_background';`);
+      if (parseInt(bgCheck.rows[0].count, 10) === 0) {
+        const defaultBg = {
+          theme: "sky-day",
+          enableClouds: true,
+          cloudSpeed: "normal",
+          cloudDensity: "high",
+          cloudOpacity: 90,
+          applyToAdmin: false,
+          preset1: {
+            id: "sky-day",
+            name: "Day Azure Sky",
+            subtitle: "Crisp Blue & Horizon Morning Azure",
+            color1: "#1d8cf8",
+            color2: "#bae6fd",
+            angle: "180deg",
+            cloudColor: "#ffffff",
+          },
+          preset2: {
+            id: "sky-sunset",
+            name: "Sunset Horizon Sky",
+            subtitle: "Warm Sunset Orange & Twilight Lavender",
+            color1: "#ea580c",
+            color2: "#6366f1",
+            angle: "160deg",
+            cloudColor: "#fff7ed",
+          },
+          custom: {
+            id: "custom",
+            name: "Custom Sky Colors",
+            subtitle: "Personalized Dual Color Sky",
+            color1: "#0284c7",
+            color2: "#7dd3fc",
+            angle: "180deg",
+            cloudColor: "#ffffff",
+          },
+        };
+        await database.query(
+          `INSERT INTO site_settings (key, value) VALUES ('site_background', $1) ON CONFLICT (key) DO NOTHING;`,
+          [JSON.stringify(defaultBg)]
+        );
+      }
     } catch (e) {
       console.warn("Site settings seed notice:", e.message);
     }

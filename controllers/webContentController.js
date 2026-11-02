@@ -1019,4 +1019,90 @@ export const deleteMenuItem = catchAsyncErrors(async (req, res, next) => {
   });
 });
 
+/* =====================================================================
+   7. BACKGROUND THEME & SKY CLOUDS CONTROLLER
+===================================================================== */
+let fallbackBackgroundSettings = {
+  theme: "sky-day", // "sky-day", "sky-sunset", "custom"
+  enableClouds: true,
+  cloudSpeed: "normal", // "slow", "normal", "fast"
+  cloudDensity: "high", // "low", "medium", "high"
+  cloudOpacity: 90,
+  applyToAdmin: false,
+  preset1: {
+    id: "sky-day",
+    name: "Day Azure Sky",
+    subtitle: "Crisp Blue & Horizon Morning Azure",
+    color1: "#1d8cf8",
+    color2: "#bae6fd",
+    angle: "180deg",
+    cloudColor: "#ffffff",
+  },
+  preset2: {
+    id: "sky-sunset",
+    name: "Sunset Horizon Sky",
+    subtitle: "Warm Sunset Orange & Twilight Lavender",
+    color1: "#ea580c",
+    color2: "#6366f1",
+    angle: "160deg",
+    cloudColor: "#fff7ed",
+  },
+  custom: {
+    id: "custom",
+    name: "Custom Sky Colors",
+    subtitle: "Personalized Dual Color Sky",
+    color1: "#0284c7",
+    color2: "#7dd3fc",
+    angle: "180deg",
+    cloudColor: "#ffffff",
+  },
+};
+
+export const getBackgroundSettings = catchAsyncErrors(async (req, res, next) => {
+  try {
+    const result = await database.query(`SELECT value FROM site_settings WHERE key = 'site_background';`);
+    if (result && result.rows && result.rows.length > 0) {
+      const parsed = JSON.parse(result.rows[0].value);
+      return res.status(200).json({
+        success: true,
+        background: { ...fallbackBackgroundSettings, ...parsed },
+      });
+    }
+  } catch (error) {
+    console.warn("Database query failed for background settings, using fallback:", error.message);
+  }
+
+  res.status(200).json({
+    success: true,
+    background: fallbackBackgroundSettings,
+  });
+});
+
+export const updateBackgroundSettings = catchAsyncErrors(async (req, res, next) => {
+  const settings = req.body;
+  if (!settings || typeof settings !== "object") {
+    return next(new ErrorHandler("Invalid background settings provided.", 400));
+  }
+
+  const merged = { ...fallbackBackgroundSettings, ...settings };
+  fallbackBackgroundSettings = merged;
+
+  try {
+    await database.query(
+      `INSERT INTO site_settings (key, value, updated_at) VALUES ('site_background', $1, CURRENT_TIMESTAMP)
+       ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = CURRENT_TIMESTAMP;`,
+      [JSON.stringify(merged)]
+    );
+  } catch (error) {
+    console.warn("Database error saving background settings:", error.message);
+  }
+
+  res.status(200).json({
+    success: true,
+    message: "Background settings updated successfully.",
+    background: merged,
+  });
+});
+
+
 
