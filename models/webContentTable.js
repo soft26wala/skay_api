@@ -168,6 +168,16 @@ export async function createWebContentTables() {
             angle: "180deg",
             cloudColor: "#ffffff",
           },
+          cardStyle: {
+            bg: "#ffffff",
+            bgOpacity: 95,
+            textColor: "#1f2937",
+            categoryColor: "#b98822",
+            priceColor: "#b98822",
+            btnBg: "#b98822",
+            btnTextColor: "#ffffff",
+            borderColor: "rgba(220, 210, 190, 0.7)",
+          },
         };
         await database.query(
           `INSERT INTO site_settings (key, value) VALUES ('site_background', $1) ON CONFLICT (key) DO NOTHING;`,
