@@ -429,11 +429,26 @@ export const fetchSingleProduct = catchAsyncErrors(async (req, res, next) => {
     `
         SELECT p.*,
         COALESCE(
+          (SELECT COUNT(DISTINCT o.id) 
+           FROM order_items oi 
+           JOIN orders o ON o.id = oi.order_id 
+           WHERE oi.product_id = p.id), 
+          0
+        ) AS total_ordered,
+        COALESCE(
+          (SELECT COUNT(DISTINCT o.id) 
+           FROM order_items oi 
+           JOIN orders o ON o.id = oi.order_id 
+           WHERE oi.product_id = p.id AND o.order_status = 'Delivered'), 
+          0
+        ) AS total_delivered,
+        COALESCE(
         json_agg(
         json_build_object(
             'review_id', r.id,
             'rating', r.rating,
             'comment', r.comment,
+            'created_at', r.created_at,
             'reviewer', json_build_object(
             'id', u.id,
             'name', u.name,
@@ -465,22 +480,23 @@ export const postProductReview = catchAsyncErrors(async (req, res, next) => {
     SELECT oi.product_id
     FROM order_items oi
     JOIN orders o ON o.id = oi.order_id
-    JOIN payments p ON p.order_id = o.id
-    WHERE o.buyer_id = $1
-    AND oi.product_id = $2
-    AND p.payment_status = 'Paid'
+    LEFT JOIN shipping_info s ON s.order_id = o.id
+    WHERE (o.buyer_id = $1 OR ($2 != '' AND s.phone = $2))
+    AND oi.product_id = $3
+    AND (o.order_status IS NULL OR o.order_status != 'Cancelled')
     LIMIT 1 
   `;
 
   const { rows } = await database.query(purchasheCheckQuery, [
     req.user.id,
+    req.user.phone || "",
     productId,
   ]);
 
-  if (rows.length === 0) {
+  if (rows.length === 0 && req.user.role !== "Admin") {
     return res.status(403).json({
       success: false,
-      message: "You can only review a product you've purchased.",
+      message: "You can only review a product you've ordered.",
     });
   }
 
@@ -529,7 +545,14 @@ export const postProductReview = catchAsyncErrors(async (req, res, next) => {
   res.status(200).json({
     success: true,
     message: "Review posted.",
-    review: review.rows[0],
+    review: {
+      ...review.rows[0],
+      reviewer: {
+        id: req.user.id,
+        name: req.user.name,
+        avatar: req.user.avatar,
+      },
+    },
     product: updatedProduct.rows[0],
   });
 });

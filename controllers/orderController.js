@@ -287,9 +287,18 @@ export const updateOrderStatus = catchAsyncErrors(async (req, res, next) => {
     return next(new ErrorHandler("Invalid order ID.", 404));
   }
 
+  let timestampClause = "";
+  if (status === "Shipped") {
+    timestampClause = ", shipped_at = COALESCE(shipped_at, NOW())";
+  } else if (status === "Out for Delivery") {
+    timestampClause = ", out_for_delivery_at = COALESCE(out_for_delivery_at, NOW()), shipped_at = COALESCE(shipped_at, NOW())";
+  } else if (status === "Delivered") {
+    timestampClause = ", delivered_at = COALESCE(delivered_at, NOW()), out_for_delivery_at = COALESCE(out_for_delivery_at, NOW()), shipped_at = COALESCE(shipped_at, NOW())";
+  }
+
   const updatedOrder = await database.query(
     `
-    UPDATE orders SET order_status = $1 WHERE id = $2 RETURNING *
+    UPDATE orders SET order_status = $1 ${timestampClause} WHERE id = $2 RETURNING *
     `,
     [status, orderId]
   );
