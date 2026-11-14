@@ -15,6 +15,13 @@ export async function createOrdersTable() {
          shipped_at TIMESTAMP,
          out_for_delivery_at TIMESTAMP,
          delivered_at TIMESTAMP,
+         stallion_shipment_id VARCHAR(100),
+         stallion_tracking_number VARCHAR(100),
+         stallion_carrier VARCHAR(100),
+         stallion_label_url TEXT,
+         stallion_status VARCHAR(100),
+         stallion_tracking_data JSONB,
+         stallion_synced_at TIMESTAMP,
          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
          FOREIGN KEY (buyer_id) REFERENCES users(id) ON DELETE SET NULL);
          
@@ -24,6 +31,13 @@ export async function createOrdersTable() {
          ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipped_at TIMESTAMP;
          ALTER TABLE orders ADD COLUMN IF NOT EXISTS out_for_delivery_at TIMESTAMP;
          ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivered_at TIMESTAMP;
+         ALTER TABLE orders ADD COLUMN IF NOT EXISTS stallion_shipment_id VARCHAR(100);
+         ALTER TABLE orders ADD COLUMN IF NOT EXISTS stallion_tracking_number VARCHAR(100);
+         ALTER TABLE orders ADD COLUMN IF NOT EXISTS stallion_carrier VARCHAR(100);
+         ALTER TABLE orders ADD COLUMN IF NOT EXISTS stallion_label_url TEXT;
+         ALTER TABLE orders ADD COLUMN IF NOT EXISTS stallion_status VARCHAR(100);
+         ALTER TABLE orders ADD COLUMN IF NOT EXISTS stallion_tracking_data JSONB;
+         ALTER TABLE orders ADD COLUMN IF NOT EXISTS stallion_synced_at TIMESTAMP;
          ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_order_status_check;
          ALTER TABLE orders ADD CONSTRAINT orders_order_status_check CHECK (order_status IN ('Processing', 'Order Placed', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled'));
          ALTER TABLE orders ALTER COLUMN buyer_id DROP NOT NULL;
