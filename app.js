@@ -30,27 +30,16 @@ app.use(
   cors({
     origin: (origin, callback) => {
       if (!origin) return callback(null, true);
-      const allowedOrigins = [
-        process.env.FRONTEND_URL,
-        process.env.DASHBOARD_URL,
-        "http://localhost:5173",
-        "http://localhost:5174",
-        "http://localhost:5175",
-        "http://127.0.0.1:5173",
-        "http://127.0.0.1:5174",
-        "http://127.0.0.1:5175",
-      ].filter(Boolean);
-
-      if (
-        allowedOrigins.includes(origin) ||
-        origin.includes("localhost") ||
-        origin.includes("127.0.0.1")
-      ) {
-        return callback(null, true);
-      }
       return callback(null, true);
     },
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "X-Requested-With",
+      "Accept",
+      "x-access-token",
+    ],
     credentials: true,
   })
 );
