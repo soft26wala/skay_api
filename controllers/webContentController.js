@@ -196,6 +196,7 @@ export const getCategories = catchAsyncErrors(async (req, res, next) => {
   try {
     const result = await database.query(`SELECT * FROM categories ORDER BY created_at ASC;`);
     if (result && result.rows && result.rows.length > 0) {
+      fallbackCategories = result.rows;
       return res.status(200).json({
         success: true,
         categories: result.rows,
@@ -331,6 +332,29 @@ export const updateCategory = catchAsyncErrors(async (req, res, next) => {
   }
 
   if (!updatedCat) {
+    try {
+      const existingFallback = fallbackCategories.find((c) => c.id === id || c.name === id) || {};
+      const catName = name ? name.trim() : (existingFallback.name || "Category");
+      const catImg = imageUrl !== undefined ? imageUrl : (existingFallback.image || "");
+      const catDesc = description !== undefined ? description : (existingFallback.description || "");
+      const insertRes = await database.query(
+        `INSERT INTO categories (id, name, image, description)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (name) DO UPDATE SET
+           image = EXCLUDED.image,
+           description = EXCLUDED.description
+         RETURNING *;`,
+        [id, catName, catImg, catDesc]
+      );
+      if (insertRes && insertRes.rows && insertRes.rows.length > 0) {
+        updatedCat = insertRes.rows[0];
+      }
+    } catch (insertErr) {
+      console.warn("Category upsert notice:", insertErr.message);
+    }
+  }
+
+  if (!updatedCat) {
     updatedCat = { id, name: name || oldName || "Category", image: imageUrl || "", description: description || "" };
   }
 
@@ -348,6 +372,7 @@ export const getHeroSlides = catchAsyncErrors(async (req, res, next) => {
   try {
     const result = await database.query(`SELECT * FROM hero_slides ORDER BY display_order ASC, created_at ASC;`);
     if (result && result.rows && result.rows.length > 0) {
+      fallbackHeroSlides = result.rows;
       return res.status(200).json({
         success: true,
         slides: result.rows,
@@ -492,6 +517,40 @@ export const updateHeroSlide = catchAsyncErrors(async (req, res, next) => {
   }
 
   if (!updatedSlide) {
+    try {
+      const existingFallback = fallbackHeroSlides.find((s) => s.id === id) || {};
+      const insertQuery = `
+        INSERT INTO hero_slides (id, title, subtitle, badge, image, link, cta_text, display_order)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        ON CONFLICT (id) DO UPDATE SET
+          title = EXCLUDED.title,
+          subtitle = EXCLUDED.subtitle,
+          badge = EXCLUDED.badge,
+          image = EXCLUDED.image,
+          link = EXCLUDED.link,
+          cta_text = EXCLUDED.cta_text,
+          display_order = EXCLUDED.display_order
+        RETURNING *;
+      `;
+      const insertRes = await database.query(insertQuery, [
+        id,
+        title || existingFallback.title || "Sacred Formulation",
+        subtitle || existingFallback.subtitle || "Elevating daily rituals",
+        badge || existingFallback.badge || "Artisanal Harvest",
+        imageUrl || existingFallback.image || "/new/hero/img1.png",
+        link || existingFallback.link || "/products",
+        cta_text || existingFallback.cta_text || "Explore Collection",
+        orderNum || existingFallback.display_order || 1,
+      ]);
+      if (insertRes && insertRes.rows && insertRes.rows.length > 0) {
+        updatedSlide = insertRes.rows[0];
+      }
+    } catch (insertErr) {
+      console.warn("Hero slide upsert notice:", insertErr.message);
+    }
+  }
+
+  if (!updatedSlide) {
     updatedSlide = { id, title, subtitle, badge, image: imageUrl, link, cta_text };
   }
 
@@ -509,6 +568,7 @@ export const getSanctumSpaces = catchAsyncErrors(async (req, res, next) => {
   try {
     const result = await database.query(`SELECT * FROM sanctum_spaces ORDER BY display_order ASC, created_at ASC;`);
     if (result && result.rows && result.rows.length > 0) {
+      fallbackSanctumSpaces = result.rows;
       return res.status(200).json({
         success: true,
         spaces: result.rows,
@@ -637,6 +697,34 @@ export const updateSanctumSpace = catchAsyncErrors(async (req, res, next) => {
   }
 
   if (!updatedSpace) {
+    try {
+      const existingFallback = fallbackSanctumSpaces.find((s) => s.id === id) || {};
+      const insertQuery = `
+        INSERT INTO sanctum_spaces (id, label, src, badge, display_order)
+        VALUES ($1, $2, $3, $4, $5)
+        ON CONFLICT (id) DO UPDATE SET
+          label = EXCLUDED.label,
+          src = EXCLUDED.src,
+          badge = EXCLUDED.badge,
+          display_order = EXCLUDED.display_order
+        RETURNING *;
+      `;
+      const insertRes = await database.query(insertQuery, [
+        id,
+        label || existingFallback.label || "Atelier Space",
+        imageUrl || existingFallback.src || "/new/hero/client/ofc.png",
+        badge || existingFallback.badge || "Atelier Sanctum",
+        orderNum || existingFallback.display_order || 1,
+      ]);
+      if (insertRes && insertRes.rows && insertRes.rows.length > 0) {
+        updatedSpace = insertRes.rows[0];
+      }
+    } catch (insertErr) {
+      console.warn("Sanctum space upsert notice:", insertErr.message);
+    }
+  }
+
+  if (!updatedSpace) {
     updatedSpace = { id, label, src: imageUrl, badge };
   }
 
@@ -654,6 +742,7 @@ export const getWhyChooseFeatures = catchAsyncErrors(async (req, res, next) => {
   try {
     const result = await database.query(`SELECT * FROM why_choose_features ORDER BY display_order ASC, created_at ASC;`);
     if (result && result.rows && result.rows.length > 0) {
+      fallbackWhyChoose = result.rows;
       return res.status(200).json({
         success: true,
         features: result.rows,
@@ -803,6 +892,42 @@ export const updateWhyChooseFeature = catchAsyncErrors(async (req, res, next) =>
   }
 
   if (!updatedFeat) {
+    try {
+      const existingFallback = fallbackWhyChoose.find((f) => f.id === id) || {};
+      const insertQuery = `
+        INSERT INTO why_choose_features (id, feature_number, title, subtitle, description, image, icon_name, is_reverse, display_order)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        ON CONFLICT (id) DO UPDATE SET
+          feature_number = EXCLUDED.feature_number,
+          title = EXCLUDED.title,
+          subtitle = EXCLUDED.subtitle,
+          description = EXCLUDED.description,
+          image = EXCLUDED.image,
+          icon_name = EXCLUDED.icon_name,
+          is_reverse = EXCLUDED.is_reverse,
+          display_order = EXCLUDED.display_order
+        RETURNING *;
+      `;
+      const insertRes = await database.query(insertQuery, [
+        id,
+        feature_number || existingFallback.feature_number || "01",
+        title || existingFallback.title || "Feature",
+        subtitle || existingFallback.subtitle || "",
+        description || existingFallback.description || "",
+        imageUrl || existingFallback.image || "",
+        icon_name || existingFallback.icon_name || "Activity",
+        isRev !== null ? isRev : (existingFallback.is_reverse || false),
+        orderNum || existingFallback.display_order || 1,
+      ]);
+      if (insertRes && insertRes.rows && insertRes.rows.length > 0) {
+        updatedFeat = insertRes.rows[0];
+      }
+    } catch (insertErr) {
+      console.warn("Why choose upsert notice:", insertErr.message);
+    }
+  }
+
+  if (!updatedFeat) {
     updatedFeat = { id, feature_number, title, subtitle, description, image: imageUrl };
   }
 
@@ -822,6 +947,7 @@ export const getAnnouncement = catchAsyncErrors(async (req, res, next) => {
   try {
     const result = await database.query(`SELECT value FROM site_settings WHERE key = 'announcement_bar';`);
     if (result && result.rows && result.rows.length > 0) {
+      fallbackAnnouncement = result.rows[0].value;
       return res.status(200).json({
         success: true,
         announcement: result.rows[0].value,
@@ -879,6 +1005,7 @@ export const getMenuItems = catchAsyncErrors(async (req, res, next) => {
       `SELECT * FROM navigation_menu ORDER BY display_order ASC, created_at ASC;`
     );
     if (result && result.rows && result.rows.length > 0) {
+      fallbackMenuItems = result.rows;
       return res.status(200).json({
         success: true,
         menu: result.rows,
@@ -990,6 +1117,37 @@ export const updateMenuItem = catchAsyncErrors(async (req, res, next) => {
   }
 
   if (!updatedItem) {
+    try {
+      const existingFallback = fallbackMenuItems.find((m) => m.id === id) || {};
+      const insertQuery = `
+        INSERT INTO navigation_menu (id, name, path, badge, is_active, display_order)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        ON CONFLICT (id) DO UPDATE SET
+          name = EXCLUDED.name,
+          path = EXCLUDED.path,
+          badge = EXCLUDED.badge,
+          is_active = EXCLUDED.is_active,
+          display_order = EXCLUDED.display_order,
+          updated_at = CURRENT_TIMESTAMP
+        RETURNING *;
+      `;
+      const insertRes = await database.query(insertQuery, [
+        id,
+        name !== undefined ? name.trim() : (existingFallback.name || "Menu Item"),
+        path !== undefined ? path.trim() : (existingFallback.path || "/"),
+        badge !== undefined ? badge.trim() : (existingFallback.badge || ""),
+        activeStatus !== null ? activeStatus : (existingFallback.is_active ?? true),
+        orderNum || existingFallback.display_order || 1,
+      ]);
+      if (insertRes && insertRes.rows && insertRes.rows.length > 0) {
+        updatedItem = insertRes.rows[0];
+      }
+    } catch (insertErr) {
+      console.warn("Navigation menu upsert notice:", insertErr.message);
+    }
+  }
+
+  if (!updatedItem) {
     updatedItem = { id, name, path, badge, is_active: activeStatus, display_order: orderNum };
   }
 
@@ -1073,9 +1231,10 @@ export const getBackgroundSettings = catchAsyncErrors(async (req, res, next) => 
     const result = await database.query(`SELECT value FROM site_settings WHERE key = 'site_background';`);
     if (result && result.rows && result.rows.length > 0) {
       const parsed = JSON.parse(result.rows[0].value);
+      fallbackBackgroundSettings = { ...fallbackBackgroundSettings, ...parsed };
       return res.status(200).json({
         success: true,
-        background: { ...fallbackBackgroundSettings, ...parsed },
+        background: fallbackBackgroundSettings,
       });
     }
   } catch (error) {
